@@ -14,11 +14,13 @@ namespace ReservationProcessor
     {
         private readonly ILogger<Worker> _logger;
         private readonly ConsumerConfig _config;
+        private readonly ReservationHttpService _httpService;
 
-        public Worker(ILogger<Worker> logger, ConsumerConfig config)
+        public Worker(ILogger<Worker> logger, ConsumerConfig config, ReservationHttpService httpService)
         {
             _logger = logger;
             _config = config;
+            _httpService = httpService;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -29,6 +31,19 @@ namespace ReservationProcessor
             {
                 var order = consumerHelper.ReadMessage<ReservationMessage>();
                 _logger.LogInformation($"Got a reservation for {order.For} for the items {order.Items}");
+
+                var numberOfItems = order.Items.Split(',').Count();
+                await Task.Delay(1000 * numberOfItems);
+                if(numberOfItems % 2 == 0)
+                {
+                    await _httpService.MarkReservationAccepted(order);
+                    _logger.LogInformation("\tApproved that order.");
+                }
+                else
+                {
+                    await _httpService.MarkReservationRejected(order);
+                    _logger.LogWarning("\tRejected that one!");
+                }
             }
         }
     }
